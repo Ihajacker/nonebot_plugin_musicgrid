@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 IMG_SIZE = 200
 TEXT_WIDTH = 450
-TEXT_MAX_WIDTH = 400
+TEXT_MAX_WIDTH = 420
 BG_DARK = "#151515"
 BG_LIGHT = "#ffffff"
 
@@ -19,7 +19,7 @@ def _truncate_to_width(text, font, max_width):
     return text + "…"
 
 
-def render_grid(images, tracks, cols, rows, include_text, font_path):
+def render_grid(images, tracks, cols, rows, include_text, font_path, text_key="name"):
     # 封面网格拼图，可选右侧文字列表
     canvas_width = cols * IMG_SIZE + (TEXT_WIDTH if include_text else 0)
     canvas_height = rows * IMG_SIZE
@@ -30,19 +30,17 @@ def render_grid(images, tracks, cols, rows, include_text, font_path):
         col, row = i % cols, i // cols
         canvas.paste(img, (col * IMG_SIZE, row * IMG_SIZE))
 
-    lines = [f"{i + 1}. {t['artist']} - {t['name']}" for i, t in enumerate(tracks[: cols * rows])]
+    lines = [f"{i + 1}. {t['artist']} - {t.get(text_key, '')}" for i, t in enumerate(tracks[: cols * rows])]
     if not include_text or not lines:
         return _to_jpeg(canvas)
 
     if not os.path.exists(font_path):
         raise FileNotFoundError(f"字体文件不存在: {font_path}")
 
-    # 字号从18递减到10，直到最宽行不超过400px
-    font_size = 18
+    # 字号仅受行高约束，上限18；超宽行绘制时单独截断
+    max_by_height = int((canvas_height - 80) / len(lines)) - 4
+    font_size = max(10, min(18, max_by_height))
     font = ImageFont.truetype(font_path, font_size)
-    while font_size > 10 and max(font.getlength(line) for line in lines) > TEXT_MAX_WIDTH:
-        font_size -= 1
-        font = ImageFont.truetype(font_path, font_size)
 
     draw = ImageDraw.Draw(canvas)
     padding_left = cols * IMG_SIZE + 30

@@ -5,17 +5,19 @@
 ## 命令行使用
 
 ```bash
-python -m nonebot_plugin_musicgrid.cli <歌单链接或ID> [-c 5] [-r 5] [--no-text] [-o out.jpg]
+python -m nonebot_plugin_musicgrid.cli <歌单链接或ID> [-c 5] [-r 5] [--no-text] [--album] [-o out.jpg]
 ```
 
 - `-c/--cols`：列数（1~10，默认 5）
 - `-r/--rows`：行数（1~10，默认 5）
-- `--no-text`：不生成右侧歌曲文字列表
+- `--no-text`：不生成右侧文字列表
+- `--album`：专辑名模式（网易云官方 API，显示真实专辑名，速度较慢）
+- `--dedup`：去重（跳过重复封面/专辑，向后扫描凑满格子）
 - `-o`：输出文件路径（默认 music_grid.jpg）
 
-## QQ 插件使用（计划中）
+## QQ 插件使用
 
-群内发送 `音乐墙 <歌单链接>`，可选 `5x5`、`notext` 参数，bot 生成拼图后发回群聊。
+群内发送 `音乐墙 <歌单链接>`，可选参数：`行x列`（如 3x3）、`notext`（无文字列表）、`album`（专辑名模式）、`dedup`（去重凑满）。
 
 ## 说明
 
