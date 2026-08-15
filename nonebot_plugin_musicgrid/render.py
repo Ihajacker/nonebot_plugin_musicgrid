@@ -19,12 +19,22 @@ def _truncate_to_width(text, font, max_width):
     return text + "…"
 
 
-def render_grid(images, tracks, cols, rows, include_text, font_path, text_key="name"):
-    # 封面网格拼图，可选右侧文字列表
+def _cover_resize(image, width, height):
+    # 等比缩放并居中裁切到目标尺寸
+    ratio = max(width / image.width, height / image.height)
+    resized = image.resize((round(image.width * ratio), round(image.height * ratio)), Image.LANCZOS)
+    left = (resized.width - width) // 2
+    top = (resized.height - height) // 2
+    return resized.crop((left, top, left + width, top + height))
+
+
+def render_grid(images, tracks, cols, rows, include_text, font_path, text_key="name",
+                background=None, background_opacity=0.5):
+    # 封面网格拼图，可选右侧文字列表与自定义背景
     canvas_width = cols * IMG_SIZE + (TEXT_WIDTH if include_text else 0)
     canvas_height = rows * IMG_SIZE
-    background = BG_DARK if include_text else BG_LIGHT
-    canvas = Image.new("RGB", (canvas_width, canvas_height), background)
+    bg_color = BG_DARK if include_text else BG_LIGHT
+    canvas = Image.new("RGB", (canvas_width, canvas_height), bg_color)
 
     for i, img in enumerate(images[: cols * rows]):
         col, row = i % cols, i // cols
@@ -33,6 +43,14 @@ def render_grid(images, tracks, cols, rows, include_text, font_path, text_key="n
     lines = [f"{i + 1}. {t['artist']} - {t.get(text_key, '')}" for i, t in enumerate(tracks[: cols * rows])]
     if not include_text or not lines:
         return _to_jpeg(canvas)
+
+    if background is not None:
+        # 背景图铺满文字区，按不透明度叠加深色
+        bg = _cover_resize(background.convert("RGB"), TEXT_WIDTH, canvas_height)
+        if background_opacity < 1:
+            overlay = Image.new("RGBA", bg.size, (21, 21, 21, int(255 * (1 - background_opacity))))
+            bg = Image.alpha_composite(bg.convert("RGBA"), overlay).convert("RGB")
+        canvas.paste(bg, (cols * IMG_SIZE, 0))
 
     if not os.path.exists(font_path):
         raise FileNotFoundError(f"字体文件不存在: {font_path}")

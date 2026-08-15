@@ -1,5 +1,8 @@
+import io
 import re
 
+import httpx
+from PIL import Image
 from nonebot import get_driver
 from nonebot.plugin import PluginMetadata
 
@@ -51,25 +54,31 @@ if driver is not None:
 
     @music_grid.handle()
     async def music_grid_handle(event: Event, args: Message = CommandArg()):
-        # 解析参数：歌单链接、可选 行x列、可选 notext/album/dedup
+        # 解析参数：歌单链接、可选 行x列、可选 notext/album/dedup/bg
         cols = plugin_config.musicgrid_default_cols
         rows = plugin_config.musicgrid_default_rows
         include_text = True
         album_mode = False
         dedup = False
+        bg_enabled = False
         playlist = ""
 
         for part in args.extract_plain_text().strip().split():
+            if part.startswith("@"):
+                continue
             if part.lower() == "notext":
                 include_text = False
             elif part.lower() == "album":
                 album_mode = True
             elif part.lower() == "dedup":
                 dedup = True
+            elif part.lower() == "bg":
+                bg_enabled = True
             elif re.fullmatch(r"\d{1,2}[xX×]\d{1,2}", part):
                 m = re.fullmatch(r"(\d{1,2})[xX×](\d{1,2})", part)
                 rows, cols = map(int, m.groups())
-            else:
+            elif not playlist:
+                # 歌单链接只取第一个非参数片段，避免被图片占位等内容覆盖
                 playlist = part
 
         if not playlist:
@@ -81,14 +90,33 @@ if driver is not None:
                 "notext  不生成右侧文字列表\n"
                 "album   专辑名模式（显示真实专辑名）\n"
                 "dedup   去重（跳过重复专辑/封面并凑满）\n"
+                "bg      使用命令附带的图片作为文字区背景\n"
                 "默认为歌曲名模式，加 album 切换为专辑名模式\n\n"
                 "示例:\n"
                 "音乐墙 3778678\n"
-                "音乐墙 3778678 3x3 album dedup"
+                "音乐墙 3778678 3x3 album dedup\n"
+                "音乐墙 3778678 bg + 附带一张图片"
             )
             await music_grid.finish(usage)
         if not (1 <= cols <= 10 and 1 <= rows <= 10):
             await music_grid.finish("行列数需在 1~10 之间")
+
+        background = None
+        if bg_enabled:
+            image_url = None
+            for seg in event.get_message():
+                if seg.type == "image" and seg.data.get("url"):
+                    image_url = seg.data["url"]
+                    break
+            if not image_url:
+                await music_grid.finish("bg 需要命令消息中附带一张图片")
+            try:
+                async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+                    resp = await client.get(image_url)
+                    resp.raise_for_status()
+                    background = Image.open(io.BytesIO(resp.content))
+            except Exception:
+                await music_grid.finish("背景图片下载失败")
 
         try:
             playlist_id = parse_playlist_id(playlist)
@@ -104,7 +132,10 @@ if driver is not None:
         try:
             images = await download_covers([t["pic"] for t in tracks], plugin_config.musicgrid_concurrency)
             font_path = config.resolve_font_path(plugin_config.musicgrid_font_path)
-            data = render_grid(images, tracks, cols, rows, include_text, font_path, text_key)
+            data = render_grid(
+                images, tracks, cols, rows, include_text, font_path, text_key,
+                background, config.BACKGROUND_OPACITY,
+            )
         except Exception as e:
             await music_grid.finish(f"生成失败: {e}")
 

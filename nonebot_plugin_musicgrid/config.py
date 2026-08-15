@@ -6,6 +6,8 @@ from pydantic import BaseModel, Extra
 DEFAULT_COLS = 5
 DEFAULT_ROWS = 5
 CONCURRENCY = 5
+# 背景图不透明度（0~1），与网页版默认一致
+BACKGROUND_OPACITY = 0.5
 
 _FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 BUNDLED_FONT = os.path.join(_FONT_DIR, "LXGWWenKaiScreen.ttf")

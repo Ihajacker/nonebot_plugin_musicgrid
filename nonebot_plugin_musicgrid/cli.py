@@ -2,6 +2,8 @@ import argparse
 import asyncio
 import sys
 
+from PIL import Image
+
 from . import config
 from .fetch import parse_playlist_id, get_tracks, download_covers
 from .render import render_grid
@@ -19,7 +21,11 @@ async def main(args):
     print(f"下载 {len(tracks)} 张封面...")
     images = await download_covers([t["pic"] for t in tracks], config.CONCURRENCY)
 
-    data = render_grid(images, tracks, args.cols, args.rows, not args.no_text, config.resolve_font_path(), text_key)
+    background = Image.open(args.bg) if args.bg else None
+    data = render_grid(
+        images, tracks, args.cols, args.rows, not args.no_text,
+        config.resolve_font_path(), text_key, background, args.bg_opacity,
+    )
     with open(args.output, "wb") as f:
         f.write(data)
     print(f"已生成: {args.output} ({args.cols}x{args.rows})")
@@ -33,6 +39,8 @@ def build_parser():
     parser.add_argument("--no-text", action="store_true", help="不生成右侧文字列表")
     parser.add_argument("--album", action="store_true", help="专辑名模式（使用网易云官方 API）")
     parser.add_argument("--dedup", action="store_true", help="去重：跳过重复封面/专辑，向后凑满")
+    parser.add_argument("--bg", help="文字区背景图片路径")
+    parser.add_argument("--bg-opacity", type=float, default=config.BACKGROUND_OPACITY, help="背景不透明度 0~1，默认 0.5")
     parser.add_argument("-o", "--output", default="music_grid.jpg")
     return parser
 
